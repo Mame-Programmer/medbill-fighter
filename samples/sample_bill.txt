@@ -1,0 +1,15 @@
+SAMPLE HOSPITAL STATEMENT (fictional data for testing)
+Patient: Jane Sample   Account #: ACCT-445566
+Facility: Out-of-network emergency room visit
+
+Date        Code    Description                              Qty   Amount
+03/14/2026  99284   Emergency department visit               1     $1,850.00
+03/14/2026  80053   Comprehensive metabolic panel            1     $210.00
+03/14/2026  84132   Potassium, serum                         1     $48.00
+03/14/2026  82947   Glucose, quantitative                    1     $39.00
+03/14/2026  85025   CBC with differential                    1     $95.00
+03/14/2026  85025   CBC with differential                    1     $95.00
+03/14/2026  99213   Office visit, established patient        1     $185.00
+03/14/2026  99214   Office visit, established patient        1     $265.00
+
+TOTAL CHARGES: $3,500.00

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MedBill Fighter</title>
+<style>
+  :root { --bg:#f7f8fa; --fg:#14181f; --muted:#5b6575; --card:#fff; --line:#e1e5ec; --accent:#0b6e4f; --high:#b42318; --med:#b54708; --info:#175cd3; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#10141a; --fg:#e8ecf2; --muted:#9aa5b5; --card:#1a2029; --line:#2a323e; --accent:#3ccf91; --high:#ff7b72; --med:#f5a45d; --info:#7ab0ff; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:860px; margin:0 auto; padding:28px 16px 64px; }
+  h1 { font-size:1.7rem; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  textarea { width:100%; min-height:200px; font:14px/1.4 ui-monospace,Menlo,Consolas,monospace; background:transparent; color:inherit; border:1px solid var(--line); border-radius:8px; padding:10px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:10px 18px; font-size:1rem; cursor:pointer; }
+  button.secondary { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .finding { border-left:4px solid var(--info); padding:8px 12px; margin:10px 0; background:rgba(127,127,127,.06); border-radius:0 8px 8px 0; }
+  .finding.high { border-color:var(--high); } .finding.medium { border-color:var(--med); }
+  .finding b { display:block; } .finding small { color:var(--muted); }
+  pre { white-space:pre-wrap; font:14px/1.5 ui-monospace,Menlo,Consolas,monospace; margin:0; }
+  .note { font-size:.85rem; color:var(--muted); }
+  #err { color:var(--high); }
+</style>
+</head>
+<body>
+<main>
+  <h1>MedBill Fighter</h1>
+  <p class="sub">Paste an itemized medical bill or an insurance denial (EOB). Get possible problems and a ready-to-edit dispute letter.</p>
+
+  <div class="card">
+    <textarea id="text" placeholder="Paste bill or denial text here. Remove your name, address and ID numbers if you prefer."></textarea>
+    <div class="row">
+      <button id="go">Analyze</button>
+      <button class="secondary" id="sample">Load sample</button>
+      <span id="err"></span>
+    </div>
+    <p class="note">Nothing here is legal, medical or tax advice. Findings are questions to ask your provider or insurer, not proof of error.</p>
+  </div>
+
+  <div id="out" hidden>
+    <div class="card"><h2 style="margin-top:0">Findings</h2><div id="summary" class="note"></div><div id="findings"></div></div>
+    <div class="card"><h2 style="margin-top:0">Draft letter</h2><pre id="letter"></pre>
+      <div class="row"><button class="secondary" id="copy">Copy letter</button></div>
+      <p class="note" id="disc"></p></div>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const SAMPLE = `03/14/2026  99284  Emergency department visit  1  $1,850.00
+03/14/2026  80053  Comprehensive metabolic panel  1  $210.00
+03/14/2026  84132  Potassium, serum  1  $48.00
+03/14/2026  85025  CBC with differential  1  $95.00
+03/14/2026  85025  CBC with differential  1  $95.00
+TOTAL CHARGES: $2,500.00`;
+$('sample').onclick = () => { $('text').value = SAMPLE; };
+$('go').onclick = async () => {
+  $('err').textContent = ''; $('go').disabled = true;
+  try {
+    const r = await fetch('/api/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: $('text').value }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Please paste more of the document.');
+    const a = data.analysis;
+    $('summary').textContent = `${a.items.length} line items, computed total $${a.computed_total.toFixed(2)}${a.stated_total!=null ? ', stated total $'+a.stated_total.toFixed(2) : ''}`;
+    $('findings').innerHTML = '';
+    a.findings.forEach(f => {
+      const d = document.createElement('div'); d.className = 'finding ' + f.severity;
+      const b = document.createElement('b'); b.textContent = f.title;
+      const p = document.createElement('div'); p.textContent = f.detail;
+      const s = document.createElement('small'); s.textContent = 'Ask: ' + f.ask;
+      d.append(b, p, s); $('findings').append(d);
+    });
+    if (!a.findings.length) $('findings').textContent = 'No automatic flags. You can still request an itemized bill and your plan\'s allowed amounts.';
+    $('letter').textContent = data.letter.letter; $('disc').textContent = data.letter.disclaimer;
+    $('out').hidden = false;
+  } catch (e) { $('err').textContent = e.message; }
+  $('go').disabled = false;
+};
+$('copy').onclick = () => navigator.clipboard.writeText($('letter').textContent);
+</script>
+</body>
+</html>

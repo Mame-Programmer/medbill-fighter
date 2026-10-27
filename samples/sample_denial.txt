@@ -1,0 +1,8 @@
+EXPLANATION OF BENEFITS (fictional data for testing)
+Claim #: CLM-99887766   Date of service: 04/02/2026
+
+Service           Billed     Allowed   Plan paid   You owe
+MRI lumbar spine  $2,400.00  $0.00     $0.00       $2,400.00
+
+Denial reason: CO-50 - not medically necessary
+Remark: CO-197 - authorization absent
