@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 
 from .codes import BUNDLES, DENIAL_CODES, EM_CODES, HIGH_CHARGE_THRESHOLD
 

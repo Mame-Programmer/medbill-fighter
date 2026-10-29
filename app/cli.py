@@ -2,6 +2,7 @@
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from .analyzer import analyze
 from .letters import build_letter
@@ -15,7 +16,7 @@ def main(argv=None) -> int:
     p.add_argument("--json", action="store_true", help="Print raw JSON")
     args = p.parse_args(argv)
 
-    text = open(args.file, encoding="utf-8").read()
+    text = Path(args.file).read_text(encoding="utf-8")
     analysis = analyze(text)
     letter = build_letter(analysis, get_provider(args.provider))
 
