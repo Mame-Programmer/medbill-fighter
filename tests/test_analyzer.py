@@ -76,3 +76,31 @@ def test_redaction():
     out = redact("SSN 123-45-6789 call 214-555-0199 email a@b.com member id: ABC1234567 on 03/14/2026")
     for secret in ["123-45-6789", "214-555-0199", "a@b.com", "ABC1234567", "03/14/2026"]:
         assert secret not in out
+
+
+def test_parses_multiple_money_columns_takes_charge_first():
+    items = parse_items("03/14/2026  99213  Office visit  1  $185.00  $60.00  $125.00")
+    assert len(items) == 1
+    assert items[0].amount == 185.00 and items[0].qty == 1
+    assert items[0].description == "Office visit"
+
+
+def test_parses_without_dollar_sign_or_date():
+    items = parse_items("85025   CBC with differential   2   95.00")
+    assert len(items) == 1
+    assert items[0].date is None and items[0].qty == 2 and items[0].amount == 95.00
+
+
+def test_parses_two_digit_year_and_thousands_separator():
+    items = parse_items("3/4/26 99284 Emergency visit $1,850.00")
+    assert items[0].date == "3/4/26" and items[0].amount == 1850.00
+
+
+def test_skips_lines_without_money():
+    assert parse_items("99213 Office visit with no price listed") == []
+    assert parse_items("Patient: Jane Sample  Account #: ACCT-445566") == []
+
+
+def test_trailing_number_in_description_does_not_change_charge():
+    items = parse_items("99213 Level 3 $120.00")
+    assert items[0].amount == 120.00

@@ -34,9 +34,12 @@
     <textarea id="text" placeholder="Paste bill or denial text here. Remove your name, address and ID numbers if you prefer."></textarea>
     <div class="row">
       <button id="go">Analyze</button>
+      <button class="secondary" id="upload">Upload bill (PDF or photo)</button>
       <button class="secondary" id="sample">Load sample</button>
-      <span id="err"></span>
+      <input type="file" id="file" hidden>
+      <span id="err" role="alert"></span>
     </div>
+    <p class="note" id="status" aria-live="polite"></p>
     <p class="note">Nothing here is legal, medical or tax advice. Findings are questions to ask your provider or insurer, not proof of error.</p>
   </div>
 
@@ -56,6 +59,34 @@ const SAMPLE = `03/14/2026  99284  Emergency department visit  1  $1,850.00
 03/14/2026  85025  CBC with differential  1  $95.00
 TOTAL CHARGES: $2,500.00`;
 $('sample').onclick = () => { $('text').value = SAMPLE; };
+
+// Ask the server what it can read, so the file picker only offers supported types.
+let canPhoto = false, maxMb = 8;
+fetch('/api/capabilities').then(r => r.json()).then(c => {
+  canPhoto = !!c.photo; maxMb = c.max_mb || 8;
+  $('file').accept = canPhoto ? 'application/pdf,image/png,image/jpeg' : 'application/pdf';
+  if (!canPhoto) $('upload').textContent = 'Upload bill (PDF)';
+}).catch(() => { $('file').accept = 'application/pdf'; });
+
+$('upload').onclick = () => $('file').click();
+$('file').onchange = async () => {
+  const f = $('file').files[0];
+  $('file').value = '';           // allow choosing the same file again
+  if (!f) return;
+  $('err').textContent = ''; $('status').textContent = '';
+  if (f.size > maxMb * 1024 * 1024) { $('err').textContent = `That file is over ${maxMb} MB.`; return; }
+  $('upload').disabled = true; $('status').textContent = 'Reading your file...';
+  try {
+    const body = new FormData(); body.append('file', f);
+    const r = await fetch('/api/extract', { method: 'POST', body });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Could not read that file.');
+    $('text').value = data.text;
+    $('status').textContent = 'Check the text above and fix any mistakes (photos can misread numbers), then click Analyze.'
+      + (data.truncated ? ' Only the first part of a long document was kept.' : '');
+  } catch (e) { $('status').textContent = ''; $('err').textContent = e.message; }
+  $('upload').disabled = false;
+};
 $('go').onclick = async () => {
   $('err').textContent = ''; $('go').disabled = true;
   try {

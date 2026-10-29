@@ -1,11 +1,13 @@
 """FastAPI app: POST /api/analyze with pasted bill/denial text."""
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from .analyzer import analyze
+from .extract import MAX_BYTES, ExtractionError, extract_text, ocr_available
 from .letters import build_letter
 from .llm import get_provider
 
@@ -33,6 +35,25 @@ def api_analyze(req: AnalyzeRequest):
     except RuntimeError as e:
         raise HTTPException(400, str(e))
     return {"analysis": analysis.to_dict(), "letter": build_letter(analysis, provider)}
+
+
+@app.post("/api/extract")
+def api_extract(file: Annotated[UploadFile, File()]):
+    """Read a PDF or photo and return its text so the user can check it before analyzing.
+
+    Declared as a plain `def` so FastAPI runs it in a worker thread; OCR is CPU-heavy.
+    """
+    data = file.file.read(MAX_BYTES + 1)  # never read more than the limit allows
+    try:
+        text = extract_text(data)
+    except ExtractionError as e:
+        raise HTTPException(422, str(e))
+    return {"text": text[:MAX_CHARS], "truncated": len(text) > MAX_CHARS}
+
+
+@app.get("/api/capabilities")
+def capabilities():
+    return {"pdf": True, "photo": ocr_available(), "max_mb": MAX_BYTES // (1024 * 1024)}
 
 
 @app.get("/api/health")

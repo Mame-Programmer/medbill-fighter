@@ -16,6 +16,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+      - name: Install Tesseract (for the photo upload tests)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: pytest -q

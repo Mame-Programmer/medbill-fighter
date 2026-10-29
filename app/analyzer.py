@@ -11,14 +11,16 @@ from dataclasses import asdict, dataclass, field
 
 from .codes import BUNDLES, DENIAL_CODES, EM_CODES, HIGH_CHARGE_THRESHOLD
 
-# e.g. "03/14/2026  99213  Office visit, established patient  1  $185.00"
+# A bill line starts with an optional date, then a 5-character procedure code, then
+# the rest (description, optional quantity, one or more money columns).
+# e.g. "03/14/2026  99213  Office visit, established patient  1  $185.00  $0.00  $185.00"
 LINE_RE = re.compile(
     r"^\s*(?:(?P<date>\d{1,2}/\d{1,2}/\d{2,4})\s+)?"
     r"(?P<code>[A-Z]?\d{4}[A-Z\d])\s+"
-    r"(?P<desc>.+?)\s+"
-    r"(?:(?P<qty>\d{1,3})\s+)?"
-    r"\$?(?P<amount>\d{1,3}(?:,\d{3})*(?:\.\d{2}))\s*$"
+    r"(?P<rest>\S.*)$"
 )
+MONEY_RE = re.compile(r"\$?\s?(\d{1,3}(?:,\d{3})*\.\d{2})(?!\d)")
+TRAILING_QTY_RE = re.compile(r"\s(\d{1,3})$")
 TOTAL_RE = re.compile(r"(?im)^\s*(?:total(?:\s+charges)?|amount\s+due)\s*[:\-]?\s*\$?(?P<amt>\d{1,3}(?:,\d{3})*(?:\.\d{2}))\s*$")
 DENIAL_RE = re.compile(r"(?i)\b(?:CO|PR|OA|PI|CARC|reason\s*code|denial\s*code|remark\s*code)[\s:#-]*(\d{1,3})\b")
 OON_RE = re.compile(r"(?i)out[\s-]of[\s-]network")
@@ -59,18 +61,33 @@ def _money(s: str) -> float:
 
 
 def parse_items(text: str) -> list[LineItem]:
+    """Parse bill lines. The first money value on a line is taken as the charge.
+
+    Statements often print several money columns (charge, adjustment, balance);
+    the charge column comes first. Lines with no money value are skipped.
+    """
     items = []
     for line in text.splitlines():
         m = LINE_RE.match(line)
         if not m:
             continue
+        rest = m.group("rest")
+        money = MONEY_RE.search(rest)
+        if not money:
+            continue
+        desc = rest[: money.start()].rstrip(" \t$")
+        qty = 1
+        qm = TRAILING_QTY_RE.search(" " + desc)
+        if qm and desc[: len(desc) - len(qm.group(1))].strip():
+            qty = int(qm.group(1))
+            desc = desc[: len(desc) - len(qm.group(1))]
         items.append(
             LineItem(
                 date=m.group("date"),
                 code=m.group("code"),
-                description=m.group("desc").strip(),
-                qty=int(m.group("qty") or 1),
-                amount=_money(m.group("amount")),
+                description=desc.strip(" -\t") or "(no description)",
+                qty=qty,
+                amount=_money(money.group(1)),
             )
         )
     return items

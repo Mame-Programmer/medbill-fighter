@@ -1,0 +1,6 @@
+# Optional: photo reading (OCR). Also needs the Tesseract program installed on the machine:
+#   macOS:  brew install tesseract
+#   Ubuntu: sudo apt-get install tesseract-ocr
+# The Dockerfile installs it for you.
+pytesseract>=0.3.10
+Pillow>=10.1
